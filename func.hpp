@@ -9,9 +9,13 @@ private:
 public:
     double *data;
     C_matrix(unsigned int n, unsigned int m);
-    void dump(std::string f_name = "Matrix_");
+    C_matrix();
     ~C_matrix();
+    void dump(std::string f_name = "Matrix_");
+    int get_column();
+    int get_row();
 };
+double *PMV(double *matrix, double *vector, unsigned int n, unsigned int m);
 
 double *init_matrix(unsigned int n, unsigned int m);
 

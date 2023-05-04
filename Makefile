@@ -6,4 +6,4 @@ main.o : main.cpp func.cpp
 	${CCPP} $^ -o $@  ${CPPFLAGS}
 
 clean:
-	rm -rf *.o
+	rm -rf *.o *.txt
