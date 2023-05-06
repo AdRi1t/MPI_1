@@ -17,4 +17,7 @@ mmio.o : mmio.c
 	mpicc -c $^ -o $@
 
 clean:
-	rm -rf *.o *.txt
+	rm -rf *.o pmv_mpi
+	
+clear_output:
+	rm -rf *.txt

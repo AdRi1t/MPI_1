@@ -80,9 +80,7 @@ double *read_from_file(std::string file_name, unsigned int *n, unsigned int *m)
     while (input_file.eof() != true && i != (*n) * (*m))
     {
         input_file >> line;
-        std::cout << line;
         data[i] = strtod(line, nullptr);
-        std::cout << data[i] << std::endl;
         i++;
     }
 

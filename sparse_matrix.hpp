@@ -1,6 +1,6 @@
 #pragma once
 
-class sparse_matrix
+class CSR_matrix
 {
 private:
     unsigned int *row_first_index;
@@ -8,7 +8,22 @@ private:
     double *data;
 
 public:
-    sparse_matrix(double *data, unsigned int dim);
-    ~sparse_matrix();
+    CSR_matrix(double *data, unsigned int dim);
+    ~CSR_matrix();
 };
+
+class COO_matrix
+{
+private:
+    unsigned int size;
+    unsigned int *row;
+    unsigned int *column;
+    double *data;
+
+public:
+    COO_matrix(unsigned int size);
+    COO_matrix(std::string mm_file_name);
+    ~COO_matrix();
+};
+
 

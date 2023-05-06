@@ -2,17 +2,17 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 #include "matrix.hpp"
 #include "MPI_function.hpp"
 #include "sparse_matrix.hpp"
-
 
 int main(int argc, char *argv[])
 {
     unsigned int matrix_size = 0;
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: %s <size matrix/file name> [dump] \n", argv[0]);
+        fprintf(stderr, "Usage: %s <size matrix/file name> [-d] \n", argv[0]);
         return 1;
     }
     else
@@ -33,9 +33,6 @@ int main(int argc, char *argv[])
 
     MPI_Comm_size(MPI_COMM_WORLD, &nb_proc);
 
-    int nb_row = matrix_size / nb_proc;
-    int last_nb_row = matrix_size % nb_proc;
-
     // Generates a test matrix and distributes it to the other core
     if (world_rank == 0)
     {
@@ -46,21 +43,21 @@ int main(int argc, char *argv[])
         }
         else
         {
-            data_matrix = init_sparse_matrix(matrix_size, matrix_size,0.2);
+            data_matrix = init_sparse_matrix(matrix_size, matrix_size, 0.5);
         }
-        dump_result(data_matrix, matrix_size, matrix_size, "Data_");
         vector = init_matrix(matrix_size, 1);
         sub_matrix = deliver_sub_matrix(data_matrix, matrix_size, nb_proc);
     }
 
-
     // All other cores receive their data
     if (world_rank != 0)
     {
-        sub_matrix = receives_sub_matrix(matrix_size, nb_proc);
+        sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
         vector = new double[matrix_size];
     }
 
+    int nb_row = matrix_size / nb_proc;
+    int last_nb_row = matrix_size % nb_proc;
     // Send the vector to everyone
     MPI_Bcast(vector, matrix_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -90,27 +87,24 @@ int main(int argc, char *argv[])
         delete[] result;
     }
 
-    if (argc >= 3)
+    if (getopt(argc, argv, "d") == 'd')
     {
-        if ("dump" == std::string(argv[2]))
+        if (world_rank != 0)
         {
-            if (world_rank != 0)
-            {
-                dump_result(sub_matrix, nb_row, matrix_size, "sub_matrix_");
-                dump_result(sub_result, nb_row, 1, "sub_result_");
-            }
-            else
-            {
-                dump_result(vector, matrix_size, 1, "vector");
-                dump_result(sub_matrix, nb_row + last_nb_row, matrix_size, "sub_matrix_");
-                dump_result(sub_result, nb_row + last_nb_row, 1, "sub_result_");
-                dump_result(result, matrix_size, 1);
-            }
+            dump_result(sub_matrix, nb_row, matrix_size, "sub_matrix_");
+            dump_result(sub_result, nb_row, 1, "sub_result_");
+        }
+        else
+        {
+            dump_result(vector, matrix_size, 1, "vector");
+            dump_result(sub_matrix, nb_row + last_nb_row, matrix_size, "sub_matrix_");
+            dump_result(sub_result, nb_row + last_nb_row, 1, "sub_result_");
+            dump_result(result, matrix_size, 1);
         }
     }
+
     delete[] vector;
     delete[] sub_matrix;
     MPI_Finalize();
     return 0;
 }
-

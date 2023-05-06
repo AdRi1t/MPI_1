@@ -3,7 +3,6 @@
 *
 *   See http://math.nist.gov/MatrixMarket for details.
 *
-*
 */
 
 
