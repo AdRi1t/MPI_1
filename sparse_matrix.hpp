@@ -1,5 +1,6 @@
 #pragma once
 
+
 class CSR_matrix
 {
 private:
@@ -16,6 +17,7 @@ class COO_matrix
 {
 private:
     unsigned int size;
+    unsigned int nb_elements;
     unsigned int *row;
     unsigned int *column;
     double *data;
@@ -23,6 +25,7 @@ private:
 public:
     COO_matrix(unsigned int size);
     COO_matrix(std::string mm_file_name);
+    void dump(std::string file_name="COO_matrix");
     ~COO_matrix();
 };
 

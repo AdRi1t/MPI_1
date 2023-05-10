@@ -3,12 +3,14 @@
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include "mmio.h"
 #include "matrix.hpp"
 #include "MPI_function.hpp"
 #include "sparse_matrix.hpp"
 
 int main(int argc, char *argv[])
 {
+    bool dump_enable = false;
     unsigned int matrix_size = 0;
     if (argc < 2)
     {
@@ -19,11 +21,15 @@ int main(int argc, char *argv[])
     {
         matrix_size = atoi(argv[1]);
     }
+    if (getopt(argc, argv, "d") == 'd')
+    {
+        dump_enable = true;
+    }
     MPI_Init(&argc, &argv);
 
     double *sub_matrix;
     double *sub_result;
-    double *vector;
+    double *sub_vector;
     int nb_proc(-1);
     int world_rank(-1);
 
@@ -37,6 +43,7 @@ int main(int argc, char *argv[])
     if (world_rank == 0)
     {
         double *data_matrix;
+        double *data_vector;
         if (matrix_size == 0)
         {
             data_matrix = read_from_file(argv[1], &matrix_size, &matrix_size);
@@ -45,65 +52,55 @@ int main(int argc, char *argv[])
         {
             data_matrix = init_sparse_matrix(matrix_size, matrix_size, 0.5);
         }
-        vector = init_matrix(matrix_size, 1);
+        data_vector = init_matrix(matrix_size, 1);
         sub_matrix = deliver_sub_matrix(data_matrix, matrix_size, nb_proc);
+        sub_vector = deliver_sub_vector(data_vector, matrix_size, nb_proc);
+        if (dump_enable)
+        {
+            dump_result(data_matrix, matrix_size, matrix_size, "data_matrix_");
+            dump_result(data_vector, matrix_size, 1, "data_vector_");
+        }
+        delete[] data_matrix;
+        delete[] data_vector;
     }
 
     // All other cores receive their data
     if (world_rank != 0)
     {
         sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
-        vector = new double[matrix_size];
+        sub_vector = receives_sub_vector(nb_proc);
     }
 
     int nb_row = matrix_size / nb_proc;
     int last_nb_row = matrix_size % nb_proc;
-    // Send the vector to everyone
-    MPI_Bcast(vector, matrix_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    
+    
+    sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
 
-    if (world_rank == 0)
-    {
-        sub_result = PMV(sub_matrix, vector, nb_row + last_nb_row, matrix_size);
-    }
-    else
-    {
-        sub_result = PMV(sub_matrix, vector, nb_row, matrix_size);
-    }
-
-    // Gather all the sub-results in rank order
-    double *result = new double[matrix_size];
-    int *nb_sent_element = new int[nb_proc];
-    int *shift = new int[nb_proc];
-    nb_sent_element[0] = nb_row + last_nb_row;
-    shift[0] = 0;
-    for (int i = 1; i < nb_proc; i++)
-    {
-        nb_sent_element[i] = nb_row;
-        shift[i] = shift[i - 1] + nb_sent_element[i - 1];
-    }
-    MPI_Gatherv(sub_result, nb_row, MPI_DOUBLE, result, nb_sent_element, shift, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    double *result;
+    result = gather_result(sub_result, matrix_size);
     if (world_rank != 0)
     {
         delete[] result;
     }
-
-    if (getopt(argc, argv, "d") == 'd')
+    if (dump_enable)
     {
         if (world_rank != 0)
         {
             dump_result(sub_matrix, nb_row, matrix_size, "sub_matrix_");
+            dump_result(sub_vector, nb_row, 1, "sub_vector_");
             dump_result(sub_result, nb_row, 1, "sub_result_");
         }
         else
         {
-            dump_result(vector, matrix_size, 1, "vector");
             dump_result(sub_matrix, nb_row + last_nb_row, matrix_size, "sub_matrix_");
+            dump_result(sub_vector, nb_row + last_nb_row, 1, "sub_vector_");
             dump_result(sub_result, nb_row + last_nb_row, 1, "sub_result_");
             dump_result(result, matrix_size, 1);
         }
     }
 
-    delete[] vector;
+    delete[] sub_vector;
     delete[] sub_matrix;
     MPI_Finalize();
     return 0;
