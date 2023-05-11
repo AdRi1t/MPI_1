@@ -88,6 +88,25 @@ double *read_from_file(std::string file_name, unsigned int *n, unsigned int *m)
     return data;
 }
 
+void print_help()
+{
+    std::cout.width(18);
+    std::cout << std::left << "pmv_mpi";
+    std::cout << std::right << " Size of matrix or source file " << std::endl;
+    std::cout.width(18);
+    std::cout << std::left << " -n ";
+    std::cout << std::right << " Specify the dimension of the square matrix " << std::endl;
+    std::cout.width(18);
+    std::cout << std::left << " -f ";
+    std::cout << std::right << " Specify the name of the input file " << std::endl;
+    std::cout.width(18);
+    std::cout << std::left << " -d ";
+    std::cout << std::right << " Create the matrix files generated during processing in a human-readable format " << std::endl;
+    std::cout.width(18);
+    std::cout << std::left << " -c ";
+    std::cout << std::right << " Use COO format to store matrices in memory " << std::endl;
+}
+
 double *init_sparse_matrix(unsigned int n, unsigned int m, float p)
 {
     srand(1337);
@@ -100,7 +119,9 @@ double *init_sparse_matrix(unsigned int n, unsigned int m, float p)
             if (rand() % 100 < p * 100)
             {
                 tab[i * m + j] = ((double)rand() / (double)RAND_MAX) * 10;
-            }else{
+            }
+            else
+            {
                 tab[i * m + j] = 0;
             }
         }

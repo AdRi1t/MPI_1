@@ -24,7 +24,10 @@ private:
 
 public:
     COO_matrix(unsigned int size);
-    COO_matrix(std::string mm_file_name);
+    void load_from_file(std::string mm_file_name);
+    void init_random_sparse(float p);
+    void deliver_sub_matrix(unsigned int rank, unsigned int nb_proc);
+    void receives_sub_matrix(unsigned int rank,unsigned int nb_proc);
     void dump(std::string file_name="COO_matrix");
     ~COO_matrix();
 };

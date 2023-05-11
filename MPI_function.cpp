@@ -146,7 +146,8 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
     unsigned int *source_rank = new unsigned int[nb_proc - 1];
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
-
+    
+    // Creation of the list of neighbors for each core
     k = world_rank;
     for (i = 0; i < nb_proc - 1; i++)
     {

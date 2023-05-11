@@ -43,12 +43,9 @@ COO_matrix::COO_matrix(unsigned int size)
 {
     this->size = size;
     this->nb_elements = 0;
-    row = new unsigned int[size];
-    column = new unsigned int[size];
-    data = new double[size];
 }
 
-COO_matrix::COO_matrix(std::string mm_file_name)
+void COO_matrix::load_from_file(std::string mm_file_name)
 {
     FILE *mm_file;
     MM_typecode matcode;
@@ -89,6 +86,90 @@ COO_matrix::COO_matrix(std::string mm_file_name)
     }
 }
 
+void COO_matrix::init_random_sparse(float p)
+{
+    unsigned int k = 0;
+    nb_elements = int(p * size * size);
+    row = new unsigned int[nb_elements];
+    column = new unsigned int[nb_elements];
+    data = new double[nb_elements];
+
+    for (unsigned int i = 0; k < nb_elements && i < size; i++)
+    {
+        for (unsigned int j = 0; k < nb_elements && j < size; j++)
+        {
+            if (rand() % 100 < p * 100)
+            {
+                row[k] = i;
+                column[k] = j;
+                data[k] = ((double)rand() / (double)RAND_MAX) * 10;
+                k++;
+            }
+        }
+    }
+}
+
+void COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_proc)
+{
+    unsigned int sub_size;
+    if (rank == 0)
+    {
+        sub_size = int(nb_elements / nb_proc) + nb_elements % nb_proc;
+    }
+    else
+    {
+        sub_size = int(nb_elements / nb_proc);
+    }
+    for (unsigned int i = 1; i < nb_proc; i++)
+    {
+        int shift_value = sub_size * i + nb_elements % nb_proc;
+        MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, 600, MPI_COMM_WORLD);
+        MPI_Send(&size, 1, MPI_UNSIGNED, i, 601, MPI_COMM_WORLD);
+        MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, 602, MPI_COMM_WORLD);
+        MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, 603, MPI_COMM_WORLD);
+        MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, 604, MPI_COMM_WORLD);
+    }
+    unsigned int *tmp_row = new unsigned int[sub_size];
+    unsigned int *tmp_column = new unsigned int[sub_size];
+    double *tmp_data = new double[sub_size];
+    std::copy(row, row + (sub_size), tmp_row);
+    std::copy(column, column + (sub_size), tmp_column);
+    std::copy(data, data + (sub_size), tmp_data);
+    row = tmp_row;
+    column = tmp_column;
+    data = tmp_data;
+}
+
+void COO_matrix::receives_sub_matrix(unsigned int rank, unsigned int nb_proc)
+{
+    MPI_Status status[5];
+    unsigned int sub_size;
+
+    MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, 600, MPI_COMM_WORLD, &(status[0]));
+    
+    if (rank == 0)
+    {
+        sub_size = nb_elements / nb_proc + nb_elements % nb_proc;
+    }
+    else
+    {
+        sub_size = nb_elements / nb_proc;
+    }
+    std::cout << "sub size " << sub_size << std::endl;
+
+    if (rank != 0)
+    {
+        row = new unsigned int[sub_size];
+        column = new unsigned int[sub_size];
+        data = new double[sub_size];
+        nb_elements = sub_size;
+        MPI_Recv(&size, 1, MPI_UNSIGNED, 0, 601, MPI_COMM_WORLD, &(status[1]));
+        MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, 602, MPI_COMM_WORLD, &(status[2]));
+        MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, 603, MPI_COMM_WORLD, &(status[3]));
+        MPI_Recv(data, sub_size, MPI_DOUBLE, 0, 604, MPI_COMM_WORLD, &(status[4]));
+    }
+}
+
 void COO_matrix::dump(std::string file_name)
 {
     std::ofstream resultFile;
@@ -98,7 +179,6 @@ void COO_matrix::dump(std::string file_name)
     file_name += std::to_string(w_rank);
     file_name += ".txt";
     resultFile.open(file_name, std::ios::out);
-    std::cout << size << "   " << nb_elements << std::endl;
     for (unsigned int i = 0; i < size; i++)
     {
         for (unsigned int j = 0; j < size; j++)
@@ -108,7 +188,7 @@ void COO_matrix::dump(std::string file_name)
                 if (row[k] == i && column[k] == j)
                 {
                     resultFile.width(6);
-                    resultFile.precision(4);
+                    resultFile.precision(3);
                     resultFile << data[k] << " ";
                     k++;
                     break;
@@ -132,3 +212,5 @@ COO_matrix::~COO_matrix()
     delete[] column;
     delete[] data;
 }
+
+
