@@ -10,5 +10,9 @@ void dump_result(double *tab, unsigned n, unsigned int m, std::string f_name = "
 
 double *read_from_file(std::string file_name, unsigned int *n, unsigned int *m);
 
+double *read_from_file_mm(std::string file_name, unsigned int *n, unsigned int *m);
+
 void print_help();
+
+
 

@@ -5,6 +5,11 @@
 #include <iomanip>
 #include "matrix.hpp"
 
+extern "C"
+{
+#include "mmio.h"
+}
+
 double *PMV(double *matrix, double *vector, unsigned int n, unsigned int m)
 {
     unsigned int i, j;
@@ -86,6 +91,68 @@ double *read_from_file(std::string file_name, unsigned int *n, unsigned int *m)
 
     input_file.close();
     return data;
+}
+
+double *read_from_file_mm(std::string file_name, unsigned int *n, unsigned int *m)
+{
+    FILE *mm_file;
+    MM_typecode matcode;
+    double *sparse_data;
+    double *data_matrix;
+    unsigned int *row;
+    unsigned int *column;
+    int nb_row, nb_column, nb_data;
+    int ret_code;
+    nb_row = 0;
+    nb_column = 0;
+    nb_data = 0;
+    ret_code = 0;
+
+    mm_file = fopen(file_name.c_str(), "r");
+    if (mm_file == NULL)
+    {
+        std::cerr << "Could not open file: " << file_name << std::endl;
+    }
+    if (mm_read_banner(mm_file, &matcode) != 0)
+    {
+        std::cerr << "Could not process Matrix Market banner" << std::endl;
+    }
+    // Obtain number of rows number of columns and number of elements
+    if ((ret_code = mm_read_mtx_crd_size(mm_file, &nb_row, &nb_column, &nb_data)) != 0)
+    {
+        std::cerr << "Could not process Matrix Market dimensions" << std::endl;
+    }
+    *m = nb_column ;
+    *n = nb_row ;
+    row = new unsigned int[nb_data];
+    column = new unsigned int[nb_data];
+    sparse_data = new double[nb_data];
+    data_matrix = new double[(*n) * (*n)];
+    // Read the elements of the file
+    for (int i = 0; i < nb_data; i++)
+    {
+        fscanf(mm_file, "%d %d %lg\n", &row[i], &column[i], &sparse_data[i]);
+        row[i]--;
+        column[i]--;
+    }
+    // Create data matrix
+    for (int i = 0; i < nb_row; i++)
+    {
+        for (int j = 0; j < nb_column; j++)
+        {
+            data_matrix[i * nb_row + j] = 0;
+        }
+    }
+    for (int i = 0; i < nb_data; i++)
+    {
+        data_matrix[row[i] * nb_row + column[i]] = sparse_data[i];
+    }
+    fclose(mm_file);
+    delete[] row;
+    delete[] column;
+    delete[] sparse_data;
+    
+    return data_matrix;
 }
 
 void print_help()

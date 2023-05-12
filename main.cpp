@@ -3,19 +3,25 @@
 #include <iostream>
 #include <fstream>
 #include <unistd.h>
+#include <chrono>
 #include "mmio.h"
 #include "matrix.hpp"
 #include "MPI_function.hpp"
 #include "sparse_matrix.hpp"
+
 
 int main(int argc, char *argv[])
 {
     bool dump_enable = false;
     bool coo_enable = false;
     bool file_source = false;
+    bool dump_matrix_result = false;
     unsigned int matrix_size = 0;
     char opt;
     extern char *optarg;
+
+    std::chrono::system_clock timer;
+
     std::string file_name;
     if (argc < 2)
     {
@@ -30,12 +36,15 @@ int main(int argc, char *argv[])
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    while ((opt = getopt(argc, argv, "dcf:n:h")) != -1)
+    while ((opt = getopt(argc, argv, "rdcf:n:h")) != -1)
     {
         switch (opt)
         {
         case 'd':
             dump_enable = true;
+            break;
+        case 'r':
+            dump_matrix_result = true;
             break;
         case 'c':
             coo_enable = true;
@@ -65,8 +74,6 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    std::cout << "World rank " << world_rank << std::endl;
-
     MPI_Comm_size(MPI_COMM_WORLD, &nb_proc);
 
     if (coo_enable == false)
@@ -82,7 +89,7 @@ int main(int argc, char *argv[])
             double *data_vector;
             if (file_source == true)
             {
-                data_matrix = read_from_file(file_name, &matrix_size, &matrix_size);
+                data_matrix = read_from_file_mm(file_name, &matrix_size, &matrix_size);
             }
             else
             {
@@ -110,7 +117,16 @@ int main(int argc, char *argv[])
         int nb_row = matrix_size / nb_proc;
         int last_nb_row = matrix_size % nb_proc;
 
+        if(world_rank ==0){
+            std::cout << "row number for sub matrix 0" << ": " << nb_row + last_nb_row << std::endl;
+            std::cout << "row number for others sub matrix" << ": " << nb_row << std::endl;
+        }
+        auto t1 = timer.now();
         sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
+        auto t2 = timer.now();
+        auto time = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1);
+        
+        std::cout << "temps :" << time.count() << "ms "<< std::endl;
 
         double *result;
         result = gather_result(sub_result, matrix_size);
@@ -118,6 +134,12 @@ int main(int argc, char *argv[])
         {
             delete[] result;
         }
+        
+        if (dump_matrix_result == true && world_rank == 0 )
+        {
+            dump_result(result, matrix_size, 1);
+        }
+        
         if (dump_enable)
         {
             if (world_rank != 0)
@@ -141,7 +163,7 @@ int main(int argc, char *argv[])
     else
     {
         COO_matrix sub_matrix(0);
-        // Generates a test matrix and distributes it to the other core
+        // Generates a test matrix in COO format and distributes it to the other core
         if (world_rank == 0)
         {
             COO_matrix *data_matrix = new COO_matrix(matrix_size);
