@@ -112,6 +112,8 @@ double *read_from_file_mm(std::string file_name, unsigned int *n, unsigned int *
     if (mm_file == NULL)
     {
         std::cerr << "Could not open file: " << file_name << std::endl;
+        MPI_Finalize();
+        exit(1);
     }
     if (mm_read_banner(mm_file, &matcode) != 0)
     {
@@ -170,8 +172,14 @@ void print_help()
     std::cout << std::left << " -d ";
     std::cout << std::right << " Create the matrix files generated during processing in a human-readable format " << std::endl;
     std::cout.width(18);
+    std::cout << std::left << " -r ";
+    std::cout << std::right << " Create matrix output files in human-readable format " << std::endl;
+    std::cout.width(18);
+    std::cout << std::left << " -p ";
+    std::cout << std::right << " Percentage of values ​​different from 0. ]0;1[ " << std::endl;
+    std::cout.width(18);
     std::cout << std::left << " -c ";
-    std::cout << std::right << " Use COO format to store matrices in memory " << std::endl;
+    std::cout << std::right << " Use COO format to store matrices in memory (TODO) " << std::endl;
 }
 
 double *init_sparse_matrix(unsigned int n, unsigned int m, float p)

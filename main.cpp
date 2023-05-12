@@ -9,6 +9,7 @@
 #include "MPI_function.hpp"
 #include "sparse_matrix.hpp"
 
+#define REPETITION 31
 
 int main(int argc, char *argv[])
 {
@@ -17,9 +18,9 @@ int main(int argc, char *argv[])
     bool file_source = false;
     bool dump_matrix_result = false;
     unsigned int matrix_size = 0;
+    float non_zero_precent = 1;
     char opt;
     extern char *optarg;
-
     std::chrono::system_clock timer;
 
     std::string file_name;
@@ -36,7 +37,7 @@ int main(int argc, char *argv[])
 
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
-    while ((opt = getopt(argc, argv, "rdcf:n:h")) != -1)
+    while ((opt = getopt(argc, argv, "rdcf:p:n:h")) != -1)
     {
         switch (opt)
         {
@@ -56,6 +57,13 @@ int main(int argc, char *argv[])
         case 'n':
             matrix_size = atoi(std::string(optarg).c_str());
             break;
+        case 'p':
+            non_zero_precent = strtof(std::string(optarg).c_str(), NULL);
+            if (non_zero_precent <= 0 || non_zero_precent >= 1)
+            {
+                non_zero_precent = 1;
+            }
+            break;
         case 'h':
             if (world_rank == 0)
             {
@@ -66,10 +74,9 @@ int main(int argc, char *argv[])
             break;
         }
     }
-
     if (matrix_size == 0 && file_source == false)
     {
-        fprintf(stderr, "Usage: %s -n size_matrix -f file source [-d] [-h] [-c] \n", argv[0]);
+        fprintf(stderr, "Usage: %s -n size_matrix -f file source [-d] [-p] [-h] [-c] \n", argv[0]);
         MPI_Finalize();
         return 1;
     }
@@ -93,7 +100,14 @@ int main(int argc, char *argv[])
             }
             else
             {
-                data_matrix = init_sparse_matrix(matrix_size, matrix_size, 0.5);
+                if (non_zero_precent == 1)
+                {
+                    data_matrix = init_matrix(matrix_size, matrix_size);
+                }
+                else
+                {
+                    data_matrix = init_sparse_matrix(matrix_size, matrix_size, non_zero_precent);
+                }
             }
             data_vector = init_matrix(matrix_size, 1);
             sub_matrix = deliver_sub_matrix(data_matrix, matrix_size, nb_proc);
@@ -117,16 +131,27 @@ int main(int argc, char *argv[])
         int nb_row = matrix_size / nb_proc;
         int last_nb_row = matrix_size % nb_proc;
 
-        if(world_rank ==0){
-            std::cout << "row number for sub matrix 0" << ": " << nb_row + last_nb_row << std::endl;
-            std::cout << "row number for others sub matrix" << ": " << nb_row << std::endl;
+        if (world_rank == 0)
+        {
+            std::cout << "row number for sub matrix 0"
+                      << ": " << nb_row + last_nb_row << std::endl;
+            std::cout << "row number for others sub matrix"
+                      << ": " << nb_row << std::endl;
         }
-        auto t1 = timer.now();
-        sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
-        auto t2 = timer.now();
-        auto time = std::chrono::duration_cast<std::chrono::milliseconds>(t2-t1);
-        
-        std::cout << "temps :" << time.count() << "ms "<< std::endl;
+
+        std::chrono::system_clock::duration duration(0);
+        for (int i = 0; i < REPETITION; i++)
+        {
+            auto t1 = timer.now();
+            sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
+            auto t2 = timer.now();
+            duration += (t2-t1);
+        }
+        auto time = std::chrono::duration_cast<std::chrono::milliseconds>((duration)/REPETITION);
+        std::cout << "temps :" << time.count() << " ms " << std::endl;
+
+        delete[] sub_vector;
+        delete[] sub_matrix;
 
         double *result;
         result = gather_result(sub_result, matrix_size);
@@ -134,12 +159,12 @@ int main(int argc, char *argv[])
         {
             delete[] result;
         }
-        
-        if (dump_matrix_result == true && world_rank == 0 )
+
+        if (dump_matrix_result == true && world_rank == 0)
         {
             dump_result(result, matrix_size, 1);
         }
-        
+
         if (dump_enable)
         {
             if (world_rank != 0)
@@ -156,9 +181,6 @@ int main(int argc, char *argv[])
                 dump_result(result, matrix_size, 1);
             }
         }
-
-        delete[] sub_vector;
-        delete[] sub_matrix;
     }
     else
     {

@@ -199,17 +199,10 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
             MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[0]));
             MPI_Isend(vector, nb_row + last_nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[1]));
 
-            if ( k == 0)
+            if (k == 0)
             {
                 start_index = 0;
                 stop_index = nb_row + last_nb_row;
-            }else{
-                start_index = source_rank[k - 1] * nb_row + last_nb_row;
-                stop_index = (source_rank[k - 1] + 1) * nb_row + last_nb_row;
-            }
-
-            if (k == 0)
-            {
                 for (i = 0; i < local_nb_row; i++)
                 {
                     result[i] = 0;
@@ -221,6 +214,8 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
             }
             else
             {
+                start_index = source_rank[k - 1] * nb_row + last_nb_row;
+                stop_index = (source_rank[k - 1] + 1) * nb_row + last_nb_row;
                 for (i = 0; i < local_nb_row; i++)
                 {
                     for (j = start_index; j < stop_index; j++)
@@ -250,38 +245,12 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
                 MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[0]));
             }
 
-            if (world_rank == 0)
-            {
-                MPI_Isend(vector, nb_row + last_nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[1]));
-            }
-            else
-            {
-                MPI_Isend(vector, nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[1]));
-            }
-
-            if (world_rank == 0 && k == 0)
-            {
-                start_index = 0;
-                stop_index = nb_row + last_nb_row;
-            }
-            else if (k == 0)
-            {
-                start_index = world_rank * nb_row + last_nb_row;
-                stop_index = (world_rank + 1) * nb_row + last_nb_row;
-            }
-            else if (k > 0 && source_rank[k - 1] == 0)
-            {
-                start_index = 0;
-                stop_index = nb_row + last_nb_row;
-            }
-            else
-            {
-                start_index = source_rank[k - 1] * nb_row + last_nb_row;
-                stop_index = (source_rank[k - 1] + 1) * nb_row + last_nb_row;
-            }
+            MPI_Isend(vector, nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD, &(request[1]));
 
             if (k == 0)
             {
+                start_index = world_rank * nb_row + last_nb_row;
+                stop_index = (world_rank + 1) * nb_row + last_nb_row;
                 for (i = 0; i < local_nb_row; i++)
                 {
                     result[i] = 0;
@@ -291,8 +260,22 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
                     }
                 }
             }
+            else if (source_rank[k - 1] == 0)
+            {
+                start_index = 0;
+                stop_index = nb_row + last_nb_row;
+                for (i = 0; i < local_nb_row; i++)
+                {
+                    for (j = start_index; j < stop_index; j++)
+                    {
+                        result[i] += matrix[i * matrix_size + j] * vector_tmp[j - start_index];
+                    }
+                }
+            }
             else
             {
+                start_index = source_rank[k - 1] * nb_row + last_nb_row;
+                stop_index = (source_rank[k - 1] + 1) * nb_row + last_nb_row;
                 for (i = 0; i < local_nb_row; i++)
                 {
                     for (j = start_index; j < stop_index; j++)
@@ -305,7 +288,6 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
             vector_tmp = next_vector;
         }
     }
-
     if (source_rank[nb_proc - 2] == 0)
     {
         start_index = 0;
@@ -316,7 +298,6 @@ double *pmv_2(double *matrix, double *vector, unsigned int matrix_size, unsigned
         start_index = source_rank[nb_proc - 2] * nb_row + last_nb_row;
         stop_index = (source_rank[nb_proc - 2] + 1) * nb_row + last_nb_row;
     }
-
     for (i = 0; i < local_nb_row; i++)
     {
         for (j = start_index; j < stop_index; j++)
