@@ -36,7 +36,7 @@ CSR_matrix::CSR_matrix(double *data, unsigned int dim)
 
 CSR_matrix::~CSR_matrix()
 {
-    //delete[] row_first_index;
+    // delete[] row_first_index;
 }
 
 COO_matrix::COO_matrix(unsigned int size)
@@ -48,6 +48,7 @@ COO_matrix::COO_matrix(unsigned int size)
 
 COO_matrix::COO_matrix(unsigned int size, float p)
 {
+    srand(1337);
     unsigned int k = 0;
     this->nb_row = size;
     this->nb_col = size;
@@ -63,7 +64,7 @@ COO_matrix::COO_matrix(unsigned int size, float p)
             {
                 row[k] = i;
                 column[k] = j;
-                data[k] = ((double)rand() / (double)RAND_MAX) * 10;
+                data[k] = ((double)rand() / (double)RAND_MAX) * 10; 
                 k++;
             }
         }
@@ -72,6 +73,7 @@ COO_matrix::COO_matrix(unsigned int size, float p)
 
 COO_matrix::COO_matrix(unsigned int n, unsigned int m, float p)
 {
+    srand(1337);
     unsigned int k = 0;
     this->nb_row = n;
     this->nb_col = m;
@@ -160,7 +162,6 @@ void COO_matrix::load_from_file(std::string mm_file_name)
     }
     fclose(mm_file);
 }
-
 
 COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_proc)
 {
@@ -260,7 +261,6 @@ COO_matrix COO_matrix::pmv(const COO_matrix &vector)
             if (this->column[k] == vector.row[j])
             {
                 result.data[this->row[k]] += this->data[k] * vector.data[j];
-                result.row[j] = this->row[k];
             }
         }
     }
@@ -278,7 +278,13 @@ COO_matrix COO_matrix::gather_result(unsigned int rank)
     result.data = new double[result.nb_elements];
     result.row = this->row;
     result.column = this->column;
-    MPI_Reduce(this->data,result.data,this->nb_elements,MPI_DOUBLE,MPI_SUM,0,MPI_COMM_WORLD);
+    MPI_Reduce(this->data, result.data, this->nb_elements, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    for (unsigned int i = 0; i < result.nb_elements; i++)
+    {
+        result.row[i] = i;
+    }
+
     return result;
 }
 

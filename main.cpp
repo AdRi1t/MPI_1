@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
             duration += (t2 - t1);
         }
         auto time = std::chrono::duration_cast<std::chrono::milliseconds>((duration) / REPETITION);
-        
+
         std::cout << "temps :" << time.count() << " ms " << std::endl;
 
         double *result;
@@ -200,8 +200,11 @@ int main(int argc, char *argv[])
                 data_matrix = COO_matrix(matrix_size, non_zero_precent);
             }
             COO_matrix data_vector(data_matrix.getNb_col(), 1, 1);
-            data_matrix.dump("data_matrix_");
-            data_vector.dump("data_vector_");
+            if (dump_enable == true)
+            {
+                data_matrix.dump("data_matrix_");
+                data_vector.dump("data_vector_");
+            }
             sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
             data_vector.bcast_vector(world_rank);
             sub_vector = data_vector;
