@@ -64,11 +64,12 @@ COO_matrix::COO_matrix(unsigned int size, float p)
             {
                 row[k] = i;
                 column[k] = j;
-                data[k] = ((double)rand() / (double)RAND_MAX) * 10; 
+                data[k] = ((double)rand() / (double)RAND_MAX) * 10;
                 k++;
             }
         }
     }
+    nb_elements = k;
 }
 
 COO_matrix::COO_matrix(unsigned int n, unsigned int m, float p)
@@ -94,6 +95,7 @@ COO_matrix::COO_matrix(unsigned int n, unsigned int m, float p)
             }
         }
     }
+    nb_elements = k;
 }
 
 void COO_matrix::free()
@@ -170,8 +172,8 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
     extra_size = nb_elements % nb_proc;
     sub_size = int(nb_elements / nb_proc);
 
-    std::cout << "sub size: " << sub_size << std::endl;
-    std::cout << "extra size: " << extra_size << std::endl;
+    // std::cout << "sub size: " << sub_size << std::endl;
+    // std::cout << "extra size: " << extra_size << std::endl;
 
     for (unsigned int i = 1; i < nb_proc; i++)
     {
@@ -188,6 +190,10 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
     std::copy(this->row, this->row + (sub_size + extra_size), tmp_row);
     std::copy(this->column, this->column + (sub_size + extra_size), tmp_column);
     std::copy(this->data, this->data + (sub_size + extra_size), tmp_data);
+    delete[] this->row;
+    delete[] this->column;
+    delete[] this->data;
+    
     this->nb_elements = (sub_size + extra_size);
     this->row = tmp_row;
     this->column = tmp_column;
@@ -236,6 +242,12 @@ void COO_matrix::bcast_vector(unsigned int rank)
     MPI_Bcast(data, nb_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
+// To do
+COO_matrix COO_matrix::pmv2(const COO_matrix &vector)
+{
+    // Distrib vector
+}
+
 COO_matrix COO_matrix::pmv(const COO_matrix &vector)
 {
     COO_matrix result(0);
@@ -249,20 +261,13 @@ COO_matrix COO_matrix::pmv(const COO_matrix &vector)
     for (unsigned int i = 0; i < vector.nb_row; i++)
     {
         result.data[i] = 0;
-        result.row[i] = 0;
+        result.row[i] = i;
         result.column[i] = 0;
     }
     // Matrix elements
-    for (unsigned int k = 0; k < nb_elements; k++)
+    for (unsigned int k = 0; k < this->nb_elements; k++)
     {
-        // Vector elements
-        for (unsigned int j = 0; j < vector.nb_elements; j++)
-        {
-            if (this->column[k] == vector.row[j])
-            {
-                result.data[this->row[k]] += this->data[k] * vector.data[j];
-            }
-        }
+        result.data[this->row[k]] += this->data[k] * vector.data[column[k]];
     }
     return result;
 }
@@ -280,11 +285,6 @@ COO_matrix COO_matrix::gather_result(unsigned int rank)
     result.column = this->column;
     MPI_Reduce(this->data, result.data, this->nb_elements, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    for (unsigned int i = 0; i < result.nb_elements; i++)
-    {
-        result.row[i] = i;
-    }
-
     return result;
 }
 
@@ -301,6 +301,38 @@ void COO_matrix::dump(std::string file_name)
     for (k = 0; k < nb_elements; k++)
     {
         resultFile << row[k] << " " << column[k] << " " << data[k] << std::endl;
+    }
+    resultFile.close();
+}
+
+void COO_matrix::readable_output(std::string file_name)
+{
+    std::ofstream resultFile;
+    int w_rank(-1);
+    unsigned int k(0);
+    MPI_Comm_rank(MPI_COMM_WORLD, &w_rank);
+    file_name += std::to_string(w_rank);
+    file_name += ".txt";
+    resultFile.open(file_name, std::ios::out);
+    for (unsigned int i = 0; i < this->nb_row; i++)
+    {
+        for (unsigned int j = 0; j < this->nb_col; j++)
+        {
+            if (this->row[k] == i && this->column[k] == j)
+            {
+                resultFile.width(6);
+                resultFile.precision(4);
+                resultFile << this->data[k] << " ";
+                k++;
+            }
+            else
+            {
+                resultFile.width(6);
+                resultFile << " 0 "
+                           << " ";
+            }
+        }
+        resultFile << std::endl;
     }
     resultFile.close();
 }

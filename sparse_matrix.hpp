@@ -37,9 +37,11 @@ public:
     COO_matrix deliver_sub_matrix(unsigned int rank, unsigned int nb_proc);
     void receives_sub_matrix(unsigned int rank, unsigned int nb_proc);
     void bcast_vector(unsigned int rank);
+    COO_matrix pmv2(const COO_matrix &vector);
     COO_matrix pmv(const COO_matrix &vector);
     COO_matrix gather_result(unsigned int rank);
     void dump(std::string file_name = "COO_matrix");
+    void readable_output(std::string file_name = "COO_matrix");
     void free();
     ~COO_matrix();
 };

@@ -147,9 +147,8 @@ int main(int argc, char *argv[])
             auto t2 = timer.now();
             duration += (t2 - t1);
         }
-        auto time = std::chrono::duration_cast<std::chrono::milliseconds>((duration) / REPETITION);
-
-        std::cout << "temps :" << time.count() << " ms " << std::endl;
+        auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
+        std::cout << "temps :" << float(time.count())/1000 << " ms " << std::endl;
 
         double *result;
         result = gather_result(sub_result, matrix_size);
@@ -184,52 +183,63 @@ int main(int argc, char *argv[])
     }
     else
     {
-        COO_matrix sub_matrix(0);
-        COO_matrix sub_vector(0);
-        COO_matrix sub_result(0);
-        // Generates a test matrix in COO format and distributes it to the other core
-        if (world_rank == 0)
+        std::chrono::system_clock::duration duration(0);
+        for (int i = 0; i < REPETITION; i++)
         {
-            COO_matrix data_matrix(0);
-            if (file_source == true)
+            COO_matrix sub_matrix(0);
+            COO_matrix sub_vector(0);
+            COO_matrix sub_result(0);
+            // Generates a test matrix in COO format and distributes it to the other core
+            if (world_rank == 0)
             {
-                data_matrix.load_from_file(file_name);
+                COO_matrix data_matrix(0);
+                if (file_source == true)
+                {
+                    data_matrix.load_from_file(file_name);
+                }
+                else
+                {
+                    data_matrix = COO_matrix(matrix_size, non_zero_precent);
+                }
+                COO_matrix data_vector(data_matrix.getNb_col(), 1, 1);
+                if (dump_enable == true)
+                {
+                    data_matrix.readable_output("data_matrix_");
+                    data_vector.readable_output("data_vector_");
+                }
+                sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
+                data_vector.bcast_vector(world_rank);
+                sub_vector = data_vector;
             }
             else
             {
-                data_matrix = COO_matrix(matrix_size, non_zero_precent);
+                sub_matrix.receives_sub_matrix(world_rank, nb_proc);
+                sub_vector.bcast_vector(world_rank);
             }
-            COO_matrix data_vector(data_matrix.getNb_col(), 1, 1);
+            COO_matrix result(0);
+
+            auto t1 = timer.now();
+            sub_result = sub_matrix.pmv(sub_vector);
+            auto t2 = timer.now();
+            duration += (t2 - t1);
+
+            result = sub_result.gather_result(world_rank);
             if (dump_enable == true)
             {
-                data_matrix.dump("data_matrix_");
-                data_vector.dump("data_vector_");
+                sub_matrix.dump("sub_matrix_");
+                sub_vector.dump("sub_vector_");
+                sub_result.dump("sub_result_");
             }
-            sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
-            data_vector.bcast_vector(world_rank);
-            sub_vector = data_vector;
+            if ((dump_matrix_result || dump_enable) && world_rank == 0)
+            {
+                result.dump("result_");
+            }
+            sub_matrix.free();
+            sub_vector.free();
+            sub_result.free();
         }
-        else
-        {
-            sub_matrix.receives_sub_matrix(world_rank, nb_proc);
-            sub_vector.bcast_vector(world_rank);
-        }
-        COO_matrix result(0);
-        sub_result = sub_matrix.pmv(sub_vector);
-        result = sub_result.gather_result(world_rank);
-        if (dump_enable == true)
-        {
-            sub_matrix.dump("sub_matrix_");
-            sub_vector.dump("sub_vector_");
-            sub_result.dump("sub_result_");
-        }
-        if ((dump_matrix_result || dump_enable) && world_rank == 0)
-        {
-            result.dump("result_");
-        }
-
-        sub_matrix.free();
-        sub_vector.free();
+        auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
+        std::cout << "temps :" << float(time.count())/1000 << " ms " << std::endl;
     }
     MPI_Finalize();
     return 0;
