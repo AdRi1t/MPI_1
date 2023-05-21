@@ -1,10 +1,17 @@
 #pragma once
 
-#define COO_NB_ELEMENTS 600
-#define COO_SIZE 001
-#define COO_ROW 602
-#define COO_COLUMN 603
-#define COO_DATA 604
+#define COO_MATRIX_NB_ELEMENTS 600
+#define COO_MATRIX_SIZE 001
+#define COO_MATRIX_ROW 602
+#define COO_MATRIX_COLUMN 603
+#define COO_MATRIX_DATA 604
+
+#define COO_VECTOR_NB_ELEMENTS 700
+#define COO_VECTOR_SIZE 701
+#define COO_VECTOR_ROW 702
+#define COO_VECTOR_COLUMN 703
+#define COO_VECTOR_DATA 704
+
 
 class CSR_matrix
 {
@@ -35,10 +42,12 @@ public:
     unsigned int getNb_col(void) const;
     void load_from_file(std::string mm_file_name);
     COO_matrix deliver_sub_matrix(unsigned int rank, unsigned int nb_proc);
+    COO_matrix deliver_sub_vector(unsigned int rank, unsigned int nb_proc);
     void receives_sub_matrix(unsigned int rank, unsigned int nb_proc);
+    void receives_sub_vector(unsigned int rank, unsigned int nb_proc);
     void bcast_vector(unsigned int rank);
-    COO_matrix pmv2(const COO_matrix &vector);
     COO_matrix pmv(const COO_matrix &vector);
+    COO_matrix pmv2(COO_matrix &vector, unsigned int rank, unsigned int nb_proc);
     COO_matrix gather_result(unsigned int rank);
     void dump(std::string file_name = "COO_matrix");
     void readable_output(std::string file_name = "COO_matrix");

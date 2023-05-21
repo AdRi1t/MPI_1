@@ -85,101 +85,100 @@ int main(int argc, char *argv[])
 
     if (coo_enable == false)
     {
-        double *sub_matrix;
-        double *sub_result;
-        double *sub_vector;
-
-        // Generates a test matrix and distributes it to the other core
-        if (world_rank == 0)
-        {
-            double *data_matrix;
-            double *data_vector;
-            if (file_source == true)
-            {
-                data_matrix = read_from_file_mm(file_name, &matrix_size, &matrix_size);
-            }
-            else
-            {
-                if (non_zero_precent == 1)
-                {
-                    data_matrix = init_matrix(matrix_size, matrix_size);
-                }
-                else
-                {
-                    data_matrix = init_sparse_matrix(matrix_size, matrix_size, non_zero_precent);
-                }
-            }
-            data_vector = init_matrix(matrix_size, 1);
-            sub_matrix = deliver_sub_matrix(data_matrix, matrix_size, nb_proc);
-            sub_vector = deliver_sub_vector(data_vector, matrix_size, nb_proc);
-            if (dump_enable)
-            {
-                dump_result(data_matrix, matrix_size, matrix_size, "data_matrix_");
-                dump_result(data_vector, matrix_size, 1, "data_vector_");
-            }
-            delete[] data_matrix;
-            delete[] data_vector;
-        }
-
-        // All other cores receive their data
-        if (world_rank != 0)
-        {
-            sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
-            sub_vector = receives_sub_vector(nb_proc);
-        }
-
-        int nb_row = matrix_size / nb_proc;
-        int last_nb_row = matrix_size % nb_proc;
-
-        if (world_rank == 0)
-        {
-            std::cout << "row number for sub matrix 0"
-                      << ": " << nb_row + last_nb_row << std::endl;
-            std::cout << "row number for others sub matrix"
-                      << ": " << nb_row << std::endl;
-        }
-
         std::chrono::system_clock::duration duration(0);
         for (int i = 0; i < REPETITION; i++)
         {
+            double *sub_matrix;
+            double *sub_result;
+            double *sub_vector;
             auto t1 = timer.now();
-            sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
-            auto t2 = timer.now();
-            duration += (t2 - t1);
-        }
-        auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
-        std::cout << "temps :" << float(time.count())/1000 << " ms " << std::endl;
-
-        double *result;
-        result = gather_result(sub_result, matrix_size);
-
-        if (dump_matrix_result == true && world_rank == 0)
-        {
-            dump_result(result, matrix_size, 1);
-        }
-
-        if (dump_enable)
-        {
+            // Generates a test matrix and distributes it to the other core
+            if (world_rank == 0)
+            {
+                double *data_matrix;
+                double *data_vector;
+                if (file_source == true)
+                {
+                    data_matrix = read_from_file_mm(file_name, &matrix_size, &matrix_size);
+                }
+                else
+                {
+                    if (non_zero_precent == 1)
+                    {
+                        data_matrix = init_matrix(matrix_size, matrix_size);
+                    }
+                    else
+                    {
+                        data_matrix = init_sparse_matrix(matrix_size, matrix_size, non_zero_precent);
+                    }
+                }
+                data_vector = init_matrix(matrix_size, 1);
+                t1 = timer.now();
+                sub_matrix = deliver_sub_matrix(data_matrix, matrix_size, nb_proc);
+                sub_vector = deliver_sub_vector(data_vector, matrix_size, nb_proc);
+                if (dump_enable)
+                {
+                    dump_result(data_matrix, matrix_size, matrix_size, "data_matrix_");
+                    dump_result(data_vector, matrix_size, 1, "data_vector_");
+                }
+                delete[] data_matrix;
+                delete[] data_vector;
+            }
+            // All other cores receive their data
             if (world_rank != 0)
             {
-                dump_result(sub_matrix, nb_row, matrix_size, "sub_matrix_");
-                dump_result(sub_vector, nb_row, 1, "sub_vector_");
-                dump_result(sub_result, nb_row, 1, "sub_result_");
+                t1 = timer.now();
+                sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
+                sub_vector = receives_sub_vector(nb_proc);
             }
-            else
+
+            int nb_row = matrix_size / nb_proc;
+            int last_nb_row = matrix_size % nb_proc;
+
+            if (world_rank == 0 && i == 0)
             {
-                dump_result(sub_matrix, nb_row + last_nb_row, matrix_size, "sub_matrix_");
-                dump_result(sub_vector, nb_row + last_nb_row, 1, "sub_vector_");
-                dump_result(sub_result, nb_row + last_nb_row, 1, "sub_result_");
+                std::cout << "row number for sub matrix 0"
+                          << ": " << nb_row + last_nb_row << std::endl;
+                std::cout << "row number for others sub matrix"
+                          << ": " << nb_row << std::endl;
+            }
+
+            sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
+            double *result;
+            result = gather_result(sub_result, matrix_size);
+
+            auto t2 = timer.now();
+            duration += (t2 - t1);
+
+            if (dump_matrix_result == true && world_rank == 0)
+            {
                 dump_result(result, matrix_size, 1);
             }
+            if (dump_enable)
+            {
+                if (world_rank != 0)
+                {
+                    dump_result(sub_matrix, nb_row, matrix_size, "sub_matrix_");
+                    dump_result(sub_vector, nb_row, 1, "sub_vector_");
+                    dump_result(sub_result, nb_row, 1, "sub_result_");
+                }
+                else
+                {
+                    dump_result(sub_matrix, nb_row + last_nb_row, matrix_size, "sub_matrix_");
+                    dump_result(sub_vector, nb_row + last_nb_row, 1, "sub_vector_");
+                    dump_result(sub_result, nb_row + last_nb_row, 1, "sub_result_");
+                    dump_result(result, matrix_size, 1);
+                }
+            }
+            if (world_rank != 0)
+            {
+                delete[] result;
+            }
+            delete[] sub_vector;
+            delete[] sub_matrix;
         }
-        if (world_rank != 0)
-        {
-            delete[] result;
-        }
-        delete[] sub_vector;
-        delete[] sub_matrix;
+        auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
+        std::cout << "temps :" << float(time.count()) / 1000 << " ms " << std::endl;
     }
     else
     {
@@ -189,6 +188,7 @@ int main(int argc, char *argv[])
             COO_matrix sub_matrix(0);
             COO_matrix sub_vector(0);
             COO_matrix sub_result(0);
+            auto t1 = timer.now();
             // Generates a test matrix in COO format and distributes it to the other core
             if (world_rank == 0)
             {
@@ -208,22 +208,24 @@ int main(int argc, char *argv[])
                     data_vector.readable_output("data_vector_");
                 }
                 sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
-                data_vector.bcast_vector(world_rank);
-                sub_vector = data_vector;
+                sub_vector = data_vector.deliver_sub_vector(world_rank, nb_proc);
+                //data_vector.bcast_vector(world_rank);
+                //sub_vector = data_vector;
             }
             else
             {
                 sub_matrix.receives_sub_matrix(world_rank, nb_proc);
-                sub_vector.bcast_vector(world_rank);
+                sub_vector.receives_sub_vector(world_rank, nb_proc);
+                //sub_vector.bcast_vector(world_rank);
             }
             COO_matrix result(0);
-
-            auto t1 = timer.now();
-            sub_result = sub_matrix.pmv(sub_vector);
+            t1 = timer.now();
+            sub_result = sub_matrix.pmv2(sub_vector, world_rank, nb_proc);
             auto t2 = timer.now();
             duration += (t2 - t1);
-
+            
             result = sub_result.gather_result(world_rank);
+            
             if (dump_enable == true)
             {
                 sub_matrix.dump("sub_matrix_");
@@ -239,7 +241,7 @@ int main(int argc, char *argv[])
             sub_result.free();
         }
         auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
-        std::cout << "temps :" << float(time.count())/1000 << " ms " << std::endl;
+        std::cout << "temps :" << float(time.count()) / 1000 << " ms " << std::endl;
     }
     MPI_Finalize();
     return 0;

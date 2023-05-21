@@ -172,17 +172,17 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
     extra_size = nb_elements % nb_proc;
     sub_size = int(nb_elements / nb_proc);
 
-    // std::cout << "sub size: " << sub_size << std::endl;
-    // std::cout << "extra size: " << extra_size << std::endl;
+    std::cout << "sub size: " << sub_size << std::endl;
+    std::cout << "extra size: " << extra_size << std::endl;
 
     for (unsigned int i = 1; i < nb_proc; i++)
     {
         int shift_value = sub_size * i + extra_size;
-        MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, COO_NB_ELEMENTS, MPI_COMM_WORLD);
-        MPI_Send(&nb_row, 1, MPI_UNSIGNED, i, COO_SIZE, MPI_COMM_WORLD);
-        MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_ROW, MPI_COMM_WORLD);
-        MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_COLUMN, MPI_COMM_WORLD);
-        MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_DATA, MPI_COMM_WORLD);
+        MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, COO_MATRIX_NB_ELEMENTS, MPI_COMM_WORLD);
+        MPI_Send(&nb_row, 1, MPI_UNSIGNED, i, COO_MATRIX_SIZE, MPI_COMM_WORLD);
+        MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_ROW, MPI_COMM_WORLD);
+        MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_COLUMN, MPI_COMM_WORLD);
+        MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_MATRIX_DATA, MPI_COMM_WORLD);
     }
     unsigned int *tmp_row = new unsigned int[sub_size + extra_size];
     unsigned int *tmp_column = new unsigned int[sub_size + extra_size];
@@ -193,7 +193,40 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
     delete[] this->row;
     delete[] this->column;
     delete[] this->data;
-    
+
+    this->nb_elements = (sub_size + extra_size);
+    this->row = tmp_row;
+    this->column = tmp_column;
+    this->data = tmp_data;
+    return *this;
+}
+
+COO_matrix COO_matrix::deliver_sub_vector(unsigned int rank, unsigned int nb_proc)
+{
+    unsigned int sub_size;
+    unsigned int extra_size;
+    extra_size = nb_elements % nb_proc;
+    sub_size = int(nb_elements / nb_proc);
+
+    for (unsigned int i = 1; i < nb_proc; i++)
+    {
+        int shift_value = sub_size * i + extra_size;
+        MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, COO_VECTOR_NB_ELEMENTS, MPI_COMM_WORLD);
+        MPI_Send(&nb_row, 1, MPI_UNSIGNED, i, COO_VECTOR_SIZE, MPI_COMM_WORLD);
+        MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_ROW, MPI_COMM_WORLD);
+        MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_COLUMN, MPI_COMM_WORLD);
+        MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_VECTOR_DATA, MPI_COMM_WORLD);
+    }
+    unsigned int *tmp_row = new unsigned int[sub_size + extra_size];
+    unsigned int *tmp_column = new unsigned int[sub_size + extra_size];
+    double *tmp_data = new double[sub_size + extra_size];
+    std::copy(this->row, this->row + (sub_size + extra_size), tmp_row);
+    std::copy(this->column, this->column + (sub_size + extra_size), tmp_column);
+    std::copy(this->data, this->data + (sub_size + extra_size), tmp_data);
+    delete[] this->row;
+    delete[] this->column;
+    delete[] this->data;
+
     this->nb_elements = (sub_size + extra_size);
     this->row = tmp_row;
     this->column = tmp_column;
@@ -207,7 +240,7 @@ void COO_matrix::receives_sub_matrix(unsigned int rank, unsigned int nb_proc)
     unsigned int sub_size;
     unsigned int extra_size;
 
-    MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_NB_ELEMENTS, MPI_COMM_WORLD, &(status[0]));
+    MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_MATRIX_NB_ELEMENTS, MPI_COMM_WORLD, &(status[0]));
 
     extra_size = nb_elements % nb_proc;
     sub_size = int(nb_elements / nb_proc);
@@ -218,11 +251,36 @@ void COO_matrix::receives_sub_matrix(unsigned int rank, unsigned int nb_proc)
         column = new unsigned int[sub_size];
         data = new double[sub_size];
         nb_elements = sub_size;
-        MPI_Recv(&nb_row, 1, MPI_UNSIGNED, 0, COO_SIZE, MPI_COMM_WORLD, &(status[1]));
+        MPI_Recv(&nb_row, 1, MPI_UNSIGNED, 0, COO_MATRIX_SIZE, MPI_COMM_WORLD, &(status[1]));
         nb_col = nb_row;
-        MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_ROW, MPI_COMM_WORLD, &(status[2]));
-        MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_COLUMN, MPI_COMM_WORLD, &(status[3]));
-        MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_DATA, MPI_COMM_WORLD, &(status[4]));
+        MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_ROW, MPI_COMM_WORLD, &(status[2]));
+        MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_COLUMN, MPI_COMM_WORLD, &(status[3]));
+        MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_MATRIX_DATA, MPI_COMM_WORLD, &(status[4]));
+    }
+}
+
+void COO_matrix::receives_sub_vector(unsigned int rank, unsigned int nb_proc)
+{
+    MPI_Status status[5];
+    unsigned int sub_size;
+    unsigned int extra_size;
+
+    MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_VECTOR_NB_ELEMENTS, MPI_COMM_WORLD, &(status[0]));
+
+    extra_size = nb_elements % nb_proc;
+    sub_size = int(nb_elements / nb_proc);
+
+    if (rank != 0)
+    {
+        row = new unsigned int[sub_size];
+        column = new unsigned int[sub_size];
+        data = new double[sub_size];
+        nb_elements = sub_size;
+        nb_col = 1;
+        MPI_Recv(&nb_row, 1, MPI_UNSIGNED, 0, COO_VECTOR_SIZE, MPI_COMM_WORLD, &(status[1]));
+        MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_ROW, MPI_COMM_WORLD, &(status[2]));
+        MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_COLUMN, MPI_COMM_WORLD, &(status[3]));
+        MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_VECTOR_DATA, MPI_COMM_WORLD, &(status[4]));
     }
 }
 
@@ -242,10 +300,123 @@ void COO_matrix::bcast_vector(unsigned int rank)
     MPI_Bcast(data, nb_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
-// To do
-COO_matrix COO_matrix::pmv2(const COO_matrix &vector)
+COO_matrix COO_matrix::pmv2(COO_matrix &sub_vector, unsigned int rank, unsigned int nb_proc)
 {
-    // Distrib vector
+    MPI_Request *request;
+    MPI_Status *status;
+    COO_matrix result(0);
+    unsigned int next_nb_elements(0);
+    unsigned int tmp_nb_elements(0);
+    unsigned int *next_rows;
+    double *next_data;
+    double *tmp_data;
+    unsigned int *tmp_rows;
+    unsigned int *dest_rank = new unsigned int[nb_proc - 1];
+    unsigned int *source_rank = new unsigned int[nb_proc - 1];
+
+    // Creation of the list of neighbors for each core
+    int k = rank;
+    for (unsigned int i = 0; i < nb_proc - 1; i++)
+    {
+        if (k == (nb_proc - 1) && rank != 0)
+        {
+            source_rank[i] = 0;
+            k = 0;
+        }
+        else if (k + 1 != rank)
+        {
+            source_rank[i] = k + 1;
+            k++;
+        }
+    }
+    k = rank;
+    for (unsigned int i = 0; i < nb_proc - 1; i++)
+    {
+        if (k == 0 && rank != (nb_proc - 1))
+        {
+            dest_rank[i] = nb_proc - 1;
+            k = nb_proc - 1;
+        }
+        else if (k - 1 != rank)
+        {
+            dest_rank[i] = k - 1;
+            k--;
+        }
+    }
+
+    result.nb_row = sub_vector.nb_row;
+    result.nb_col = sub_vector.nb_col;
+    result.nb_elements = sub_vector.nb_row;
+    result.row = new unsigned int[sub_vector.nb_row];
+    result.column = new unsigned int[sub_vector.nb_row];
+    result.data = new double[sub_vector.nb_row];
+
+    for (unsigned int i = 0; i < result.nb_row; i++)
+    {
+        result.data[i] = 0;
+        result.row[i] = i;
+        result.column[i] = 0;
+    }
+
+    for (unsigned int k = 0; k < nb_proc - 1; k++)
+    {
+        request = new MPI_Request[4];
+        status = new MPI_Status[4];
+        if (source_rank[k] == 0)
+        {
+            next_nb_elements = sub_vector.nb_row / nb_proc + sub_vector.nb_row % nb_proc;
+        }
+        else
+        {
+            next_nb_elements = sub_vector.nb_row / nb_proc;
+        }
+        next_rows = new unsigned int[next_nb_elements];
+        next_data = new double[next_nb_elements];
+        MPI_Irecv(next_rows, next_nb_elements, MPI_UNSIGNED, source_rank[k], 401, MPI_COMM_WORLD, &(request[0]));
+        MPI_Irecv(next_data, next_nb_elements, MPI_DOUBLE, source_rank[k], 403, MPI_COMM_WORLD, &(request[1]));
+        MPI_Isend(sub_vector.row, sub_vector.nb_elements, MPI_UNSIGNED, dest_rank[k], 401, MPI_COMM_WORLD, &(request[2]));
+        MPI_Isend(sub_vector.data, sub_vector.nb_elements, MPI_DOUBLE, dest_rank[k], 403, MPI_COMM_WORLD, &(request[3]));
+        
+        if (k == 0)
+        {
+            unsigned int start_row = sub_vector.row[0];
+            unsigned int end_row = sub_vector.row[sub_vector.nb_elements - 1];
+            for (unsigned k = 0; k < this->nb_elements; k++)
+            {
+                if (this->column[k] >= start_row && this->column[k] <= end_row)
+                {
+                    result.data[this->row[k]] += this->data[k] * sub_vector.data[this->column[k] - start_row];
+                }
+            }
+        }
+        else
+        {
+            unsigned int start_row = tmp_rows[0];
+            unsigned int end_row = tmp_rows[tmp_nb_elements - 1];
+            for (unsigned k = 0; k < this->nb_elements; k++)
+            {
+                if (this->column[k] >= start_row && this->column[k] <= end_row)
+                {
+                    result.data[this->row[k]] += this->data[k] * tmp_data[this->column[k] - start_row];
+                }
+            }
+        }
+        MPI_Wait(request, status);
+        tmp_data = next_data;
+        tmp_nb_elements = next_nb_elements;
+        tmp_rows = next_rows;
+    }
+
+    unsigned int start_row = tmp_rows[0];
+    unsigned int end_row = tmp_rows[tmp_nb_elements - 1];
+    for (unsigned k = 0; k < this->nb_elements; k++)
+    {
+        if (this->column[k] >= start_row && this->column[k] <= end_row)
+        {
+            result.data[this->row[k]] += this->data[k] * tmp_data[this->column[k] - start_row];
+        }
+    }
+    return result;
 }
 
 COO_matrix COO_matrix::pmv(const COO_matrix &vector)
@@ -267,7 +438,7 @@ COO_matrix COO_matrix::pmv(const COO_matrix &vector)
     // Matrix elements
     for (unsigned int k = 0; k < this->nb_elements; k++)
     {
-        result.data[this->row[k]] += this->data[k] * vector.data[column[k]];
+        result.data[this->row[k]] += this->data[k] * vector.data[this->column[k]];
     }
     return result;
 }
