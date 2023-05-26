@@ -1,0 +1,18 @@
+{
+BasedOnStyle: LLVM,
+Language: Cpp,
+IndentWidth: 2,
+MaxEmptyLinesToKeep: 1,
+NamespaceIndentation: All,
+ColumnLimit: 100,
+BreakBeforeBraces: Allman,
+PenaltyBreakAssignment: 2,
+PenaltyReturnTypeOnItsOwnLine: 200,
+PointerAlignment: Left,
+SpaceBeforeParens: Never,
+AccessModifierOffset: '2',
+AlignAfterOpenBracket: Align,
+AlignTrailingComments: 'true',
+ReflowComments: 'false',
+TabWidth: '2',
+}

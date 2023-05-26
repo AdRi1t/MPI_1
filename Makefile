@@ -1,5 +1,5 @@
 CCPP=mpic++
-CPPFLAGS= -g
+CPPFLAGS= -g -W
 all: pmv_mpi
 
 pmv_mpi: main.o matrix.o MPI_function.o sparse_matrix.o mmio.o
