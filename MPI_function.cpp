@@ -20,11 +20,12 @@ double* deliver_sub_matrix(double* data_matrix, unsigned int matrix_size, int nb
     {
       int shift_value = nb_row * i * matrix_size + last_nb_row * matrix_size;
       MPI_Send(&matrix_size, 1, MPI_UNSIGNED, i, SUB_MATRIX_SIZE_TAG, MPI_COMM_WORLD);
-      MPI_Send((data_matrix + shift_value), nb_row * matrix_size, MPI_DOUBLE, i, SUB_MATRIX_TAG,
-               MPI_COMM_WORLD);
+      MPI_Send((data_matrix + shift_value), nb_row * matrix_size, MPI_DOUBLE, i,
+               SUB_MATRIX_TAG, MPI_COMM_WORLD);
     }
     sub_matrix = new double[matrix_size * (nb_row + last_nb_row)];
-    std::copy(data_matrix, data_matrix + ((nb_row + last_nb_row) * matrix_size), sub_matrix);
+    std::copy(data_matrix, data_matrix + ((nb_row + last_nb_row) * matrix_size),
+              sub_matrix);
   }
 
   return sub_matrix;
@@ -43,12 +44,13 @@ double* receives_sub_matrix(unsigned int* matrix_size, int nb_proc)
 
   if(world_rank != 0)
   {
-    MPI_Recv(matrix_size, 1, MPI_UNSIGNED, 0, SUB_MATRIX_SIZE_TAG, MPI_COMM_WORLD, &status);
+    MPI_Recv(matrix_size, 1, MPI_UNSIGNED, 0, SUB_MATRIX_SIZE_TAG, MPI_COMM_WORLD,
+             &status);
     nb_row = *matrix_size / nb_proc;
     sub_matrix = new double[(*matrix_size) * nb_row];
 
-    MPI_Recv(sub_matrix, nb_row * (*matrix_size), MPI_DOUBLE, 0, SUB_MATRIX_TAG, MPI_COMM_WORLD,
-             &status);
+    MPI_Recv(sub_matrix, nb_row * (*matrix_size), MPI_DOUBLE, 0, SUB_MATRIX_TAG,
+             MPI_COMM_WORLD, &status);
   }
   return sub_matrix;
 }
@@ -69,7 +71,8 @@ double* deliver_sub_vector(double* data_vector, unsigned int vector_size, int nb
     {
       int shift_value = nb_row * i + last_nb_row;
       MPI_Send(&vector_size, 1, MPI_UNSIGNED, i, SUB_VECTOR_SIZE_TAG, MPI_COMM_WORLD);
-      MPI_Send((data_vector + shift_value), nb_row, MPI_DOUBLE, i, SUB_VECTOR_TAG, MPI_COMM_WORLD);
+      MPI_Send((data_vector + shift_value), nb_row, MPI_DOUBLE, i, SUB_VECTOR_TAG,
+               MPI_COMM_WORLD);
     }
     sub_vector = new double[nb_row + last_nb_row];
     std::copy(data_vector, data_vector + (nb_row + last_nb_row), sub_vector);
@@ -92,7 +95,8 @@ double* receives_sub_vector(int nb_proc)
 
   if(world_rank != 0)
   {
-    MPI_Recv(&vector_size, 1, MPI_UNSIGNED, 0, SUB_VECTOR_SIZE_TAG, MPI_COMM_WORLD, &status);
+    MPI_Recv(&vector_size, 1, MPI_UNSIGNED, 0, SUB_VECTOR_SIZE_TAG, MPI_COMM_WORLD,
+             &status);
     nb_row = vector_size / nb_proc;
     sub_vector = new double[nb_row];
 
@@ -123,19 +127,21 @@ double* gather_result(double* sub_result, unsigned int matrix_size)
   }
   if(world_rank == 0)
   {
-    MPI_Gatherv(sub_result, nb_row + last_nb_row, MPI_DOUBLE, result, nb_sent_element, shift,
-                MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gatherv(sub_result, nb_row + last_nb_row, MPI_DOUBLE, result, nb_sent_element,
+                shift, MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
   else
   {
-    MPI_Gatherv(sub_result, nb_row, MPI_DOUBLE, result, nb_sent_element, shift, MPI_DOUBLE, 0,
-                MPI_COMM_WORLD);
+    MPI_Gatherv(sub_result, nb_row, MPI_DOUBLE, result, nb_sent_element, shift,
+                MPI_DOUBLE, 0, MPI_COMM_WORLD);
   }
 
   return result;
 }
 
-double* pmv_2(double* matrix, double* vector, unsigned int matrix_size, unsigned int nb_proc)
+/* Performs the matrix-vector product, taking care of communication between nodes. */
+double* pmv_2(double* matrix, double* vector, unsigned int matrix_size,
+              unsigned int nb_proc)
 {
   int world_rank;
   unsigned int i, j, k;
@@ -201,10 +207,10 @@ double* pmv_2(double* matrix, double* vector, unsigned int matrix_size, unsigned
       request = new MPI_Request[2];
       status = new MPI_Status[2];
       next_vector = new double[nb_row];
-      MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR, MPI_COMM_WORLD,
-                &(request[0]));
-      MPI_Isend(vector, nb_row + last_nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD,
-                &(request[1]));
+      MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR,
+                MPI_COMM_WORLD, &(request[0]));
+      MPI_Isend(vector, nb_row + last_nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR,
+                MPI_COMM_WORLD, &(request[1]));
 
       if(k == 0)
       {
@@ -244,14 +250,14 @@ double* pmv_2(double* matrix, double* vector, unsigned int matrix_size, unsigned
       if(source_rank[k] == 0)
       {
         next_vector = new double[nb_row + last_nb_row];
-        MPI_Irecv(next_vector, nb_row + last_nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR,
-                  MPI_COMM_WORLD, &(request[0]));
+        MPI_Irecv(next_vector, nb_row + last_nb_row, MPI_DOUBLE, source_rank[k],
+                  SWAP_VECTOR, MPI_COMM_WORLD, &(request[0]));
       }
       else
       {
         next_vector = new double[nb_row];
-        MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR, MPI_COMM_WORLD,
-                  &(request[0]));
+        MPI_Irecv(next_vector, nb_row, MPI_DOUBLE, source_rank[k], SWAP_VECTOR,
+                  MPI_COMM_WORLD, &(request[0]));
       }
 
       MPI_Isend(vector, nb_row, MPI_DOUBLE, dest_rank[k], SWAP_VECTOR, MPI_COMM_WORLD,

@@ -1,0 +1,15 @@
+#!/bin/bash
+#MSUB -r matrice_1024         # Request name
+#MSUB -n 32            # Number of tasks to use
+#MSUB -c 1
+#MSUB -N 1				# nombre de noeuds
+#MSUB -T 1000                # Elapsed time limit in seconds
+#MSUB -o sortie_%I.o        # Standard output. %I is the job id
+#MSUB -e sortie_%I.e        # Error output. %I is the job id
+#MSUB -A ocre              # Project ID
+#MSUB -q rome
+set -x
+cd ${BRIDGE_MSUB_PWD}
+
+ccc_mprun ./pmv_mpi 1024
+

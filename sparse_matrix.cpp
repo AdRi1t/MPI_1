@@ -40,6 +40,7 @@ CSR_matrix::~CSR_matrix()
   // delete[] row_first_index;
 }
 
+/* Create an empty square matrix of dimension size */
 COO_matrix::COO_matrix(unsigned int size)
 {
   this->nb_row = size;
@@ -47,6 +48,7 @@ COO_matrix::COO_matrix(unsigned int size)
   this->nb_elements = 0;
 }
 
+/* Create a sparse matrix of dimension size */
 COO_matrix::COO_matrix(unsigned int size, float p)
 {
   srand(1337);
@@ -99,6 +101,7 @@ COO_matrix::COO_matrix(unsigned int n, unsigned int m, float p)
   nb_elements = k;
 }
 
+/* Always initiates the same matrix depending on its size */
 void COO_matrix::init_for_test()
 {
   this->nb_elements = nb_col * nb_row;
@@ -119,6 +122,7 @@ void COO_matrix::init_for_test()
   }
 }
 
+/* Frees the memory of the matrix */
 void COO_matrix::free()
 {
   nb_col = 0;
@@ -131,10 +135,14 @@ void COO_matrix::free()
 
 COO_matrix::~COO_matrix() {}
 
+/* Accessor functions */
 unsigned int COO_matrix::getNb_row(void) const { return nb_row; }
 
 unsigned int COO_matrix::getNb_col(void) const { return nb_col; }
 
+unsigned int COO_matrix::getNb_elements(void) const { return nb_elements; }
+
+/* Loads a matrix in MM format */
 void COO_matrix::load_from_file(std::string mm_file_name)
 {
   FILE* mm_file;
@@ -178,6 +186,7 @@ void COO_matrix::load_from_file(std::string mm_file_name)
   fclose(mm_file);
 }
 
+/* From one core distributes the matrix into sub-matrices for the other cores */
 COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_proc)
 {
   unsigned int sub_size;
@@ -185,17 +194,17 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
   extra_size = nb_elements % nb_proc;
   sub_size = int(nb_elements / nb_proc);
 
-  std::cout << "sub size: " << sub_size << std::endl;
-  std::cout << "extra size: " << extra_size << std::endl;
-
   for(unsigned int i = 1; i < nb_proc; i++)
   {
     int shift_value = sub_size * i + extra_size;
     MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, COO_MATRIX_NB_ELEMENTS, MPI_COMM_WORLD);
     MPI_Send(&nb_row, 1, MPI_UNSIGNED, i, COO_MATRIX_SIZE, MPI_COMM_WORLD);
-    MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_ROW, MPI_COMM_WORLD);
-    MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_COLUMN, MPI_COMM_WORLD);
-    MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_MATRIX_DATA, MPI_COMM_WORLD);
+    MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_ROW,
+             MPI_COMM_WORLD);
+    MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_MATRIX_COLUMN,
+             MPI_COMM_WORLD);
+    MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_MATRIX_DATA,
+             MPI_COMM_WORLD);
   }
   unsigned int* tmp_row = new unsigned int[sub_size + extra_size];
   unsigned int* tmp_column = new unsigned int[sub_size + extra_size];
@@ -214,6 +223,7 @@ COO_matrix COO_matrix::deliver_sub_matrix(unsigned int rank, unsigned int nb_pro
   return *this;
 }
 
+/* From one core distributes the vector into sub-vector for the other cores */
 COO_matrix COO_matrix::deliver_sub_vector(unsigned int rank, unsigned int nb_proc)
 {
   unsigned int sub_size;
@@ -226,9 +236,12 @@ COO_matrix COO_matrix::deliver_sub_vector(unsigned int rank, unsigned int nb_pro
     int shift_value = sub_size * i + extra_size;
     MPI_Send(&nb_elements, 1, MPI_UNSIGNED, i, COO_VECTOR_NB_ELEMENTS, MPI_COMM_WORLD);
     MPI_Send(&nb_row, 1, MPI_UNSIGNED, i, COO_VECTOR_SIZE, MPI_COMM_WORLD);
-    MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_ROW, MPI_COMM_WORLD);
-    MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_COLUMN, MPI_COMM_WORLD);
-    MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_VECTOR_DATA, MPI_COMM_WORLD);
+    MPI_Send((row + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_ROW,
+             MPI_COMM_WORLD);
+    MPI_Send((column + shift_value), sub_size, MPI_UNSIGNED, i, COO_VECTOR_COLUMN,
+             MPI_COMM_WORLD);
+    MPI_Send((data + shift_value), sub_size, MPI_DOUBLE, i, COO_VECTOR_DATA,
+             MPI_COMM_WORLD);
   }
   unsigned int* tmp_row = new unsigned int[sub_size + extra_size];
   unsigned int* tmp_column = new unsigned int[sub_size + extra_size];
@@ -246,14 +259,15 @@ COO_matrix COO_matrix::deliver_sub_vector(unsigned int rank, unsigned int nb_pro
   this->data = tmp_data;
   return *this;
 }
-
+/* Initializes the sub-matrix received from an MPI communication */
 void COO_matrix::receives_sub_matrix(unsigned int rank, unsigned int nb_proc)
 {
   MPI_Status status[5];
   unsigned int sub_size;
   unsigned int extra_size;
 
-  MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_MATRIX_NB_ELEMENTS, MPI_COMM_WORLD, &(status[0]));
+  MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_MATRIX_NB_ELEMENTS, MPI_COMM_WORLD,
+           &(status[0]));
 
   extra_size = nb_elements % nb_proc;
   sub_size = int(nb_elements / nb_proc);
@@ -266,19 +280,24 @@ void COO_matrix::receives_sub_matrix(unsigned int rank, unsigned int nb_proc)
     nb_elements = sub_size;
     MPI_Recv(&nb_row, 1, MPI_UNSIGNED, 0, COO_MATRIX_SIZE, MPI_COMM_WORLD, &(status[1]));
     nb_col = nb_row;
-    MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_ROW, MPI_COMM_WORLD, &(status[2]));
-    MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_COLUMN, MPI_COMM_WORLD, &(status[3]));
-    MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_MATRIX_DATA, MPI_COMM_WORLD, &(status[4]));
+    MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_ROW, MPI_COMM_WORLD,
+             &(status[2]));
+    MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_MATRIX_COLUMN, MPI_COMM_WORLD,
+             &(status[3]));
+    MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_MATRIX_DATA, MPI_COMM_WORLD,
+             &(status[4]));
   }
 }
 
+/* Initializes the sub-vector received from an MPI communication */
 void COO_matrix::receives_sub_vector(unsigned int rank, unsigned int nb_proc)
 {
   MPI_Status status[5];
   unsigned int sub_size;
   unsigned int extra_size;
 
-  MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_VECTOR_NB_ELEMENTS, MPI_COMM_WORLD, &(status[0]));
+  MPI_Recv(&nb_elements, 1, MPI_UNSIGNED, 0, COO_VECTOR_NB_ELEMENTS, MPI_COMM_WORLD,
+           &(status[0]));
 
   extra_size = nb_elements % nb_proc;
   sub_size = int(nb_elements / nb_proc);
@@ -291,12 +310,16 @@ void COO_matrix::receives_sub_vector(unsigned int rank, unsigned int nb_proc)
     nb_elements = sub_size;
     nb_col = 1;
     MPI_Recv(&nb_row, 1, MPI_UNSIGNED, 0, COO_VECTOR_SIZE, MPI_COMM_WORLD, &(status[1]));
-    MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_ROW, MPI_COMM_WORLD, &(status[2]));
-    MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_COLUMN, MPI_COMM_WORLD, &(status[3]));
-    MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_VECTOR_DATA, MPI_COMM_WORLD, &(status[4]));
+    MPI_Recv(row, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_ROW, MPI_COMM_WORLD,
+             &(status[2]));
+    MPI_Recv(column, sub_size, MPI_UNSIGNED, 0, COO_VECTOR_COLUMN, MPI_COMM_WORLD,
+             &(status[3]));
+    MPI_Recv(data, sub_size, MPI_DOUBLE, 0, COO_VECTOR_DATA, MPI_COMM_WORLD,
+             &(status[4]));
   }
 }
 
+/* Broadcast the same vector to all other cores */
 void COO_matrix::bcast_vector(unsigned int rank)
 {
   MPI_Bcast(&nb_row, 1, MPI_UNSIGNED, 0, MPI_COMM_WORLD);
@@ -313,7 +336,9 @@ void COO_matrix::bcast_vector(unsigned int rank)
   MPI_Bcast(data, nb_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 }
 
-COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank, unsigned int nb_proc)
+/* Performs the matrix-vector product, taking care of communication between nodes. */
+COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank,
+                            unsigned int nb_proc)
 {
   MPI_Request* request;
   MPI_Status* status;
@@ -385,10 +410,10 @@ COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank, unsigned 
     }
     next_rows = new unsigned int[next_nb_elements];
     next_data = new double[next_nb_elements];
-    MPI_Irecv(next_rows, next_nb_elements, MPI_UNSIGNED, source_rank[k], 401, MPI_COMM_WORLD,
-              &(request[0]));
-    MPI_Irecv(next_data, next_nb_elements, MPI_DOUBLE, source_rank[k], 403, MPI_COMM_WORLD,
-              &(request[1]));
+    MPI_Irecv(next_rows, next_nb_elements, MPI_UNSIGNED, source_rank[k], 401,
+              MPI_COMM_WORLD, &(request[0]));
+    MPI_Irecv(next_data, next_nb_elements, MPI_DOUBLE, source_rank[k], 403,
+              MPI_COMM_WORLD, &(request[1]));
     MPI_Isend(sub_vector.row, sub_vector.nb_elements, MPI_UNSIGNED, dest_rank[k], 401,
               MPI_COMM_WORLD, &(request[2]));
     MPI_Isend(sub_vector.data, sub_vector.nb_elements, MPI_DOUBLE, dest_rank[k], 403,
@@ -402,7 +427,8 @@ COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank, unsigned 
       {
         if(this->column[k] >= start_row && this->column[k] <= end_row)
         {
-          result.data[this->row[k]] += this->data[k] * sub_vector.data[this->column[k] - start_row];
+          result.data[this->row[k]] +=
+              this->data[k] * sub_vector.data[this->column[k] - start_row];
         }
       }
     }
@@ -414,7 +440,8 @@ COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank, unsigned 
       {
         if(this->column[k] >= start_row && this->column[k] <= end_row)
         {
-          result.data[this->row[k]] += this->data[k] * tmp_data[this->column[k] - start_row];
+          result.data[this->row[k]] +=
+              this->data[k] * tmp_data[this->column[k] - start_row];
         }
       }
     }
@@ -436,6 +463,7 @@ COO_matrix COO_matrix::pmv2(COO_matrix& sub_vector, unsigned int rank, unsigned 
   return result;
 }
 
+/* Performs the matrix-vector product */
 COO_matrix COO_matrix::pmv(const COO_matrix& vector)
 {
   COO_matrix result(0);
@@ -471,11 +499,13 @@ COO_matrix COO_matrix::gather_result(unsigned int rank)
   result.data = new double[result.nb_elements];
   result.row = this->row;
   result.column = this->column;
-  MPI_Reduce(this->data, result.data, this->nb_elements, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  MPI_Reduce(this->data, result.data, this->nb_elements, MPI_DOUBLE, MPI_SUM, 0,
+             MPI_COMM_WORLD);
 
   return result;
 }
 
+/* Print the matrix to a file */
 void COO_matrix::dump(std::string file_name)
 {
   std::ofstream resultFile;
@@ -493,6 +523,7 @@ void COO_matrix::dump(std::string file_name)
   resultFile.close();
 }
 
+/* Print the matrix to a file */
 void COO_matrix::readable_output(std::string file_name)
 {
   std::ofstream resultFile;

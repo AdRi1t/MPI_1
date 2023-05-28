@@ -10,7 +10,7 @@
 #include "mmio.h"
 #include "sparse_matrix.hpp"
 
-#define REPETITION 31
+#define REPETITION 4
 
 int main(int argc, char* argv[])
 {
@@ -22,7 +22,9 @@ int main(int argc, char* argv[])
   unsigned int matrix_size = 0;
   char opt;
   extern char* optarg;
-  std::chrono::system_clock timer;
+  double duration(0);
+  double t1(0);
+  double t2(0);
 
   std::string file_name;
   if(argc < 2)
@@ -42,38 +44,39 @@ int main(int argc, char* argv[])
   {
     switch(opt)
     {
-    case 'd':
-      dump_enable = true;
-      break;
-    case 'r':
-      dump_matrix_result = true;
-      break;
-    case 'c':
-      coo_enable = true;
-      break;
-    case 'v':
-      distributed_vector = true;
-      break;
-    case 'f':
-      file_source = true;
-      file_name.assign(optarg);
-      break;
-    case 'n':
-      matrix_size = atoi(std::string(optarg).c_str());
-      break;
-    case 'h':
-      if(world_rank == 0)
-      {
-        print_help();
-      }
-      MPI_Finalize();
-      return 0;
-      break;
+      case 'd':
+        dump_enable = true;
+        break;
+      case 'r':
+        dump_matrix_result = true;
+        break;
+      case 'c':
+        coo_enable = true;
+        break;
+      case 'v':
+        distributed_vector = true;
+        break;
+      case 'f':
+        file_source = true;
+        file_name.assign(optarg);
+        break;
+      case 'n':
+        matrix_size = atoi(std::string(optarg).c_str());
+        break;
+      case 'h':
+        if(world_rank == 0)
+        {
+          print_help();
+        }
+        MPI_Finalize();
+        return 0;
+        break;
     }
   }
   if(matrix_size == 0 && file_source == false)
   {
-    fprintf(stderr, "Usage: %s -n size_matrix -f file source [-d] [-p] [-h] [-c] \n", argv[0]);
+    fprintf(stderr, "Usage: %s -n size_matrix -f file source [-d] [-p] [-h] [-c] \n",
+            argv[0]);
     MPI_Finalize();
     return 1;
   }
@@ -82,7 +85,6 @@ int main(int argc, char* argv[])
 
   if(coo_enable == false)
   {
-    std::chrono::system_clock::duration duration(0);
     for(int i = 0; i < REPETITION; i++)
     {
       double* sub_matrix;
@@ -108,6 +110,7 @@ int main(int argc, char* argv[])
 
         if(distributed_vector == true)
         {
+          t1 = MPI_Wtime();
           sub_vector = deliver_sub_vector(data_vector, matrix_size, nb_proc);
         }
         if(dump_enable)
@@ -122,6 +125,7 @@ int main(int argc, char* argv[])
         sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
         if(distributed_vector == true)
         {
+          t1 = MPI_Wtime();
           sub_vector = receives_sub_vector(nb_proc);
         }
         else
@@ -141,15 +145,14 @@ int main(int argc, char* argv[])
       }
       if(distributed_vector == true)
       {
-        auto t1 = timer.now();
         sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
         result = gather_result(sub_result, matrix_size);
-        auto t2 = timer.now();
+        t2 = MPI_Wtime();
         duration += (t2 - t1);
       }
       else
       {
-        auto t1 = timer.now();
+        t1 = MPI_Wtime();
         MPI_Bcast(data_vector, matrix_size, MPI_DOUBLE, 0, MPI_COMM_WORLD);
         if(world_rank == 0)
         {
@@ -160,7 +163,7 @@ int main(int argc, char* argv[])
           sub_result = PMV(sub_matrix, data_vector, nb_row, matrix_size);
         }
         result = gather_result(sub_result, matrix_size);
-        auto t2 = timer.now();
+        t2 = MPI_Wtime();
         duration += (t2 - t1);
       }
 
@@ -197,13 +200,13 @@ int main(int argc, char* argv[])
       {
         delete[] sub_vector;
       }
+      delete[] sub_result;
     }
-    auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
-    std::cout << "temps :" << float(time.count()) / 1000 << " ms " << std::endl;
+    duration /= REPETITION;
+    std::cout << "temps :" << duration * 1000 << " ms " << std::endl;
   }
   else
   {
-    std::chrono::system_clock::duration duration(0);
     for(int i = 0; i < REPETITION; i++)
     {
       COO_matrix sub_matrix(0);
@@ -211,8 +214,7 @@ int main(int argc, char* argv[])
       COO_matrix sub_result(0);
       COO_matrix data_matrix(0);
       COO_matrix data_vector(0);
-      auto t1 = timer.now();
-      // Generates a test matrix in COO format and distributes it to the other core
+
       if(world_rank == 0)
       {
         if(file_source == true)
@@ -232,6 +234,7 @@ int main(int argc, char* argv[])
           data_vector.readable_output("data_vector_");
         }
         sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
+        t1 = MPI_Wtime();
         if(distributed_vector == true)
         {
           sub_vector = data_vector.deliver_sub_vector(world_rank, nb_proc);
@@ -245,6 +248,7 @@ int main(int argc, char* argv[])
       else
       {
         sub_matrix.receives_sub_matrix(world_rank, nb_proc);
+        t1 = MPI_Wtime();
         if(distributed_vector == true)
         {
           sub_vector.receives_sub_vector(world_rank, nb_proc);
@@ -254,21 +258,30 @@ int main(int argc, char* argv[])
           sub_vector.bcast_vector(world_rank);
         }
       }
+
+      if(world_rank == 0 && i == 0)
+      {
+        unsigned int sub_size;
+        unsigned int extra_size;
+        sub_size = int(data_matrix.getNb_elements() / nb_proc);
+        extra_size = data_matrix.getNb_elements() % nb_proc;
+        std::cout << "sub size: " << sub_size << std::endl;
+        std::cout << "extra size: " << extra_size << std::endl;
+      }
+
       COO_matrix result(0);
       if(distributed_vector == true)
       {
-        t1 = timer.now();
         sub_result = sub_matrix.pmv2(sub_vector, world_rank, nb_proc);
         result = sub_result.gather_result(world_rank);
-        auto t2 = timer.now();
+        t2 = MPI_Wtime();
         duration += (t2 - t1);
       }
       else
       {
-        t1 = timer.now();
         sub_result = sub_matrix.pmv(sub_vector);
         result = sub_result.gather_result(world_rank);
-        auto t2 = timer.now();
+        auto t2 = MPI_Wtime();
         duration += (t2 - t1);
       }
       if(dump_enable == true)
@@ -285,8 +298,7 @@ int main(int argc, char* argv[])
       sub_vector.free();
       sub_result.free();
     }
-    auto time = std::chrono::duration_cast<std::chrono::microseconds>((duration) / REPETITION);
-    std::cout << "temps :" << float(time.count()) / 1000 << " ms " << std::endl;
+    std::cout << "temps :" << duration * 1000 << " ms " << std::endl;
   }
 
   MPI_Finalize();

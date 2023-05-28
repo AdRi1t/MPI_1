@@ -1,7 +1,8 @@
 #pragma once
 
+/* Defining communication tags */
 #define COO_MATRIX_NB_ELEMENTS 600
-#define COO_MATRIX_SIZE 001
+#define COO_MATRIX_SIZE 601
 #define COO_MATRIX_ROW 602
 #define COO_MATRIX_COLUMN 603
 #define COO_MATRIX_DATA 604
@@ -24,6 +25,7 @@ public:
   ~CSR_matrix();
 };
 
+/* Class for matrices stored in COO format */
 class COO_matrix
 {
 private:
@@ -41,6 +43,7 @@ public:
   void init_for_test();
   unsigned int getNb_row(void) const;
   unsigned int getNb_col(void) const;
+  unsigned int getNb_elements(void) const;
   void load_from_file(std::string mm_file_name);
   COO_matrix deliver_sub_matrix(unsigned int rank, unsigned int nb_proc);
   COO_matrix deliver_sub_vector(unsigned int rank, unsigned int nb_proc);

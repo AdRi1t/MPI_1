@@ -16,6 +16,9 @@ double* deliver_sub_vector(double* data_vector, unsigned int vector_size, int nb
 
 double* receives_sub_vector(int nb_proc);
 
-double* pmv_2(double* matrix, double* vector, unsigned int matrix_size, unsigned int nb_proc);
+double* pmv_2(double* matrix, double* vector, unsigned int matrix_size,
+              unsigned int nb_proc);
 
 double* gather_result(double* sub_result, unsigned int matrix_size);
+
+void print_global_info();

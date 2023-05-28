@@ -11,6 +11,7 @@ extern "C"
 #include "mmio.h"
 }
 
+/* Performs the matrix-vector product */
 double* PMV(double* matrix, double* vector, unsigned int n, unsigned int m)
 {
   unsigned int i, j;
@@ -26,6 +27,7 @@ double* PMV(double* matrix, double* vector, unsigned int n, unsigned int m)
   return result;
 }
 
+/* Create and initialize a matrix of dimension n*m */
 double* init_matrix(unsigned int n, unsigned int m)
 {
   srand(1337);
@@ -42,6 +44,7 @@ double* init_matrix(unsigned int n, unsigned int m)
   return tab;
 }
 
+/* Print the matrix to a file */
 void dump_result(double* tab, unsigned n, unsigned int m, std::string f_name)
 {
   std::ofstream resultFile;
@@ -76,7 +79,7 @@ double* read_from_file(std::string file_name, unsigned int* n, unsigned int* m)
   *n = strtol(line, nullptr, 10);
   input_file >> line;
   *m = strtol(line, nullptr, 10);
-  i  = 0;
+  i = 0;
 
   if(*n != 0 && *m != 0)
   {
@@ -94,6 +97,7 @@ double* read_from_file(std::string file_name, unsigned int* n, unsigned int* m)
   return data;
 }
 
+/* Loads a matrix in MM format */
 double* read_from_file_mm(std::string file_name, unsigned int* n, unsigned int* m)
 {
   FILE* mm_file;
@@ -104,10 +108,10 @@ double* read_from_file_mm(std::string file_name, unsigned int* n, unsigned int* 
   unsigned int* column;
   int nb_row, nb_column, nb_data;
   int ret_code;
-  nb_row    = 0;
+  nb_row = 0;
   nb_column = 0;
-  nb_data   = 0;
-  ret_code  = 0;
+  nb_data = 0;
+  ret_code = 0;
 
   mm_file = fopen(file_name.c_str(), "r");
   if(mm_file == NULL)
@@ -125,10 +129,10 @@ double* read_from_file_mm(std::string file_name, unsigned int* n, unsigned int* 
   {
     std::cerr << "Could not process Matrix Market dimensions" << std::endl;
   }
-  *m          = nb_column;
-  *n          = nb_row;
-  row         = new unsigned int[nb_data];
-  column      = new unsigned int[nb_data];
+  *m = nb_column;
+  *n = nb_row;
+  row = new unsigned int[nb_data];
+  column = new unsigned int[nb_data];
   sparse_data = new double[nb_data];
   data_matrix = new double[(*n) * (*n)];
   // Read the elements of the file
@@ -158,6 +162,7 @@ double* read_from_file_mm(std::string file_name, unsigned int* n, unsigned int* 
   return data_matrix;
 }
 
+/* Displays program help */
 void print_help()
 {
   std::cout.width(18);
@@ -171,12 +176,14 @@ void print_help()
   std::cout << std::right << " Specify the name of the input file " << std::endl;
   std::cout.width(18);
   std::cout << std::left << " -d ";
-  std::cout << std::right
-            << " Create the matrix files generated during processing in a human-readable format "
-            << std::endl;
+  std::cout
+      << std::right
+      << " Create the matrix files generated during processing in a human-readable format "
+      << std::endl;
   std::cout.width(18);
   std::cout << std::left << " -r ";
-  std::cout << std::right << " Create matrix output files in human-readable format " << std::endl;
+  std::cout << std::right << " Create matrix output files in human-readable format "
+            << std::endl;
   std::cout.width(18);
   std::cout << std::left << " -c ";
   std::cout << std::right << " Use COO format to store matrices in memory " << std::endl;
