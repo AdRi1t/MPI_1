@@ -10,5 +10,5 @@
 set -x
 cd ${BRIDGE_MSUB_PWD}
 
-ccc_mprun ./pmv_mpi -f mm/Goodwin_040.mtx
+ccc_mprun -x ./pmv_mpi -f mm/fidapm37.mtx
 ccc_msub MPI_pmv128_base.sh
