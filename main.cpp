@@ -10,7 +10,7 @@
 #include "mmio.h"
 #include "sparse_matrix.hpp"
 
-#define REPETITION 4
+#define REPETITION 64
 
 int main(int argc, char* argv[])
 {
@@ -110,7 +110,6 @@ int main(int argc, char* argv[])
 
         if(distributed_vector == true)
         {
-          t1 = MPI_Wtime();
           sub_vector = deliver_sub_vector(data_vector, matrix_size, nb_proc);
         }
         if(dump_enable)
@@ -125,7 +124,6 @@ int main(int argc, char* argv[])
         sub_matrix = receives_sub_matrix(&matrix_size, nb_proc);
         if(distributed_vector == true)
         {
-          t1 = MPI_Wtime();
           sub_vector = receives_sub_vector(nb_proc);
         }
         else
@@ -145,10 +143,11 @@ int main(int argc, char* argv[])
       }
       if(distributed_vector == true)
       {
+        t1 = MPI_Wtime();
         sub_result = pmv_2(sub_matrix, sub_vector, matrix_size, nb_proc);
-        result = gather_result(sub_result, matrix_size);
         t2 = MPI_Wtime();
         duration += (t2 - t1);
+        result = gather_result(sub_result, matrix_size);
       }
       else
       {
@@ -162,9 +161,9 @@ int main(int argc, char* argv[])
         {
           sub_result = PMV(sub_matrix, data_vector, nb_row, matrix_size);
         }
-        result = gather_result(sub_result, matrix_size);
         t2 = MPI_Wtime();
         duration += (t2 - t1);
+        result = gather_result(sub_result, matrix_size);
       }
 
       if(dump_matrix_result == true && world_rank == 0)
@@ -196,9 +195,14 @@ int main(int argc, char* argv[])
       {
         delete[] sub_matrix;
       }
+
       if(distributed_vector == true)
       {
         delete[] sub_vector;
+      }
+      else if(world_rank != 0)
+      {
+        delete[] data_vector;
       }
       delete[] sub_result;
     }
@@ -234,13 +238,13 @@ int main(int argc, char* argv[])
           data_vector.readable_output("data_vector_");
         }
         sub_matrix = data_matrix.deliver_sub_matrix(world_rank, nb_proc);
-        t1 = MPI_Wtime();
         if(distributed_vector == true)
         {
           sub_vector = data_vector.deliver_sub_vector(world_rank, nb_proc);
         }
         else
         {
+          t1 = MPI_Wtime();
           data_vector.bcast_vector(world_rank);
           sub_vector = data_vector;
         }
@@ -248,13 +252,13 @@ int main(int argc, char* argv[])
       else
       {
         sub_matrix.receives_sub_matrix(world_rank, nb_proc);
-        t1 = MPI_Wtime();
         if(distributed_vector == true)
         {
           sub_vector.receives_sub_vector(world_rank, nb_proc);
         }
         else
         {
+          t1 = MPI_Wtime();
           sub_vector.bcast_vector(world_rank);
         }
       }
@@ -272,17 +276,18 @@ int main(int argc, char* argv[])
       COO_matrix result(0);
       if(distributed_vector == true)
       {
+        t1 = MPI_Wtime();
         sub_result = sub_matrix.pmv2(sub_vector, world_rank, nb_proc);
-        result = sub_result.gather_result(world_rank);
         t2 = MPI_Wtime();
         duration += (t2 - t1);
+        result = sub_result.gather_result(world_rank);
       }
       else
       {
         sub_result = sub_matrix.pmv(sub_vector);
-        result = sub_result.gather_result(world_rank);
         auto t2 = MPI_Wtime();
         duration += (t2 - t1);
+        result = sub_result.gather_result(world_rank);
       }
       if(dump_enable == true)
       {
@@ -294,9 +299,18 @@ int main(int argc, char* argv[])
       {
         result.dump("result_");
       }
-      sub_matrix.free();
-      sub_vector.free();
-      sub_result.free();
+      if(world_rank == 0)
+      {
+        data_matrix.free();
+        data_vector.free();
+        sub_result.free();
+      }
+      else
+      {
+        sub_matrix.free();
+        sub_vector.free();
+        sub_result.free();
+      }
     }
     std::cout << "temps :" << duration * 1000 << " ms " << std::endl;
   }
