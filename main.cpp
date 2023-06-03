@@ -10,7 +10,7 @@
 #include "mmio.h"
 #include "sparse_matrix.hpp"
 
-#define REPETITION 64
+#define REPETITION 31
 
 int main(int argc, char* argv[])
 {
@@ -230,6 +230,17 @@ int main(int argc, char* argv[])
           data_matrix = COO_matrix(matrix_size);
           data_matrix.init_for_test();
         }
+
+        if(world_rank == 0 && i == 0)
+        {
+          unsigned int sub_size;
+          unsigned int extra_size;
+          sub_size = int(data_matrix.getNb_elements() / nb_proc);
+          extra_size = data_matrix.getNb_elements() % nb_proc;
+          std::cout << "sub size: " << sub_size << std::endl;
+          std::cout << "extra size: " << extra_size << std::endl;
+        }
+
         data_vector = COO_matrix(data_matrix.getNb_col(), 1, 1);
         data_vector.init_for_test();
         if(dump_enable == true)
@@ -261,16 +272,6 @@ int main(int argc, char* argv[])
           t1 = MPI_Wtime();
           sub_vector.bcast_vector(world_rank);
         }
-      }
-
-      if(world_rank == 0 && i == 0)
-      {
-        unsigned int sub_size;
-        unsigned int extra_size;
-        sub_size = int(data_matrix.getNb_elements() / nb_proc);
-        extra_size = data_matrix.getNb_elements() % nb_proc;
-        std::cout << "sub size: " << sub_size << std::endl;
-        std::cout << "extra size: " << extra_size << std::endl;
       }
 
       COO_matrix result(0);
